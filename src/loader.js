@@ -21,12 +21,12 @@ const exec = (loaderContext, code, filename) => {
 };
 
 const findModuleById = (modules, id) => {
-  for (const module of modules) {
+  /* for (const module of modules) {
     if (module.id === id) {
       return module;
     }
-  }
-  return null;
+  } */
+  return modules.find(module => module.id === id) || null;
 };
 
 export function pitch(request) {
@@ -44,13 +44,13 @@ export function pitch(request) {
   };
   const childCompiler = this._compilation.createChildCompiler(
     `${pluginName} ${request}`,
-    outputOptions
+    outputOptions,
   );
   new NodeTemplatePlugin(outputOptions).apply(childCompiler);
   new LibraryTemplatePlugin(null, 'commonjs2').apply(childCompiler);
   new NodeTargetPlugin().apply(childCompiler);
   new SingleEntryPlugin(this.context, `!!${request}`, pluginName).apply(
-    childCompiler
+    childCompiler,
   );
   new LimitChunkCountPlugin({ maxChunks: 1 }).apply(childCompiler);
   // We set loaderContext[NS] = false to indicate we already in
@@ -63,49 +63,48 @@ export function pitch(request) {
         (loaderContext, module) => {
           loaderContext[NS] = false; // eslint-disable-line no-param-reassign
           if (module.request === request) {
-            module.loaders = loaders.map((loader) => {
-              // eslint-disable-line no-param-reassign
-              return {
-                loader: loader.path,
-                options: loader.options,
-                ident: loader.ident,
-              };
-            });
+            module.loaders = loaders.map(({
+                                            path : loader, options, ident,
+                                          }) => ({
+              loader,
+              options,
+              ident,
+            }));
           }
-        }
+        },
       );
-    }
+    },
   );
 
   let source;
-  childCompiler.hooks.afterCompile.tap(pluginName, (compilation) => {
+  childCompiler.hooks.afterCompile.tap(pluginName, ({ assets, chunks }) => {
     source =
-      compilation.assets[childFilename] &&
-      compilation.assets[childFilename].source();
+      assets[childFilename] &&
+      assets[childFilename].source();
 
     // Remove all chunk assets
-    compilation.chunks.forEach((chunk) => {
+    chunks.forEach((chunk) => {
       chunk.files.forEach((file) => {
-        delete compilation.assets[file]; // eslint-disable-line no-param-reassign
+        delete assets[file]; // eslint-disable-line no-param-reassign
       });
     });
   });
 
   const callback = this.async();
-  childCompiler.runAsChild((err, entries, compilation) => {
+  childCompiler.runAsChild((err, entries, {errors, fileDependencies, contextDependencies}) => {
     if (err) return callback(err);
 
-    if (compilation.errors.length > 0) {
+    if (errors.length > 0) {
       return callback(compilation.errors[0]);
     }
-    compilation.fileDependencies.forEach((dep) => {
+    fileDependencies.forEach((dep) => {
       this.addDependency(dep);
     }, this);
-    compilation.contextDependencies.forEach((dep) => {
+    contextDependencies.forEach((dep) => {
       this.addContextDependency(dep);
     }, this);
     if (!source) {
-      return callback(new Error("Didn't get a result from child compiler"));
+      return callback(new Error('Didn\'t get a result from child compiler'));
     }
     let text;
     let locals;
@@ -137,4 +136,5 @@ export function pitch(request) {
     return callback(null, resultSource);
   });
 }
+
 export default function() {}

@@ -19,7 +19,7 @@ class CssDependency extends webpack.Dependency {
   constructor(
     { identifier, content, media, sourceMap },
     context,
-    identifierIndex
+    identifierIndex,
   ) {
     super();
     this.identifier = identifier;
@@ -40,13 +40,20 @@ class CssDependencyTemplate {
 }
 
 class CssModule extends webpack.Module {
-  constructor(dependency) {
-    super(NS, dependency.context);
-    this._identifier = dependency.identifier;
-    this._identifierIndex = dependency.identifierIndex;
-    this.content = dependency.content;
-    this.media = dependency.media;
-    this.sourceMap = dependency.sourceMap;
+  constructor({
+                context,
+                identifier,
+                identifierIndex,
+                content,
+                media,
+                sourceMap,
+              }) {
+    super(NS, context);
+    this._identifier = identifier;
+    this._identifierIndex = identifierIndex;
+    this.content = content;
+    this.media = media;
+    this.sourceMap = sourceMap;
   }
 
   // no source() so webpack doesn't do add stuff to the bundle
@@ -59,17 +66,16 @@ class CssModule extends webpack.Module {
     return `css ${this._identifier} ${this._identifierIndex}`;
   }
 
-  readableIdentifier(requestShortener) {
-    return `css ${requestShortener.shorten(this._identifier)}${
+  readableIdentifier({ shorten }) {
+    return `css ${shorten(this._identifier)}${
       this._identifierIndex ? ` (${this._identifierIndex})` : ''
-    }`;
+      }`;
   }
 
   nameForCondition() {
     const resource = this._identifier.split('!').pop();
     const idx = resource.indexOf('?');
-    if (idx >= 0) return resource.substring(0, idx);
-    return resource;
+    return idx >= 0 ? resource.substring(0, idx) : resource;
   }
 
   updateCacheModule(module) {
@@ -108,7 +114,7 @@ class MiniCssExtractPlugin {
       {
         filename: '[name].css',
       },
-      options
+      options,
     );
     if (!this.options.chunkFilename) {
       const { filename } = this.options;
@@ -122,7 +128,7 @@ class MiniCssExtractPlugin {
         // Elsewise prefix '[id].' in front of the basename to make it changing
         this.options.chunkFilename = filename.replace(
           /(^|\/)([^/]*(?:\?|$))/,
-          '$1[id].$2'
+          '$1[id].$2',
         );
       }
     }
@@ -137,8 +143,8 @@ class MiniCssExtractPlugin {
           if (!Array.isArray(content) && content != null) {
             throw new Error(
               `Exported value was not extracted as an array: ${JSON.stringify(
-                content
-              )}`
+                content,
+              )}`,
             );
           }
           const identifierCountMap = new Map();
@@ -151,17 +157,17 @@ class MiniCssExtractPlugin {
       });
       compilation.dependencyFactories.set(
         CssDependency,
-        new CssModuleFactory()
+        new CssModuleFactory(),
       );
       compilation.dependencyTemplates.set(
         CssDependency,
-        new CssDependencyTemplate()
+        new CssDependencyTemplate(),
       );
       compilation.mainTemplate.hooks.renderManifest.tap(
         pluginName,
         (result, { chunk }) => {
           const renderedModules = Array.from(chunk.modulesIterable).filter(
-            (module) => module.type === NS
+            (module) => module.type === NS,
           );
           if (renderedModules.length > 0) {
             result.push({
@@ -169,7 +175,7 @@ class MiniCssExtractPlugin {
                 this.renderContentAsset(
                   chunk,
                   renderedModules,
-                  compilation.runtimeTemplate.requestShortener
+                  compilation.runtimeTemplate.requestShortener,
                 ),
               filenameTemplate: this.options.filename,
               pathOptions: {
@@ -180,13 +186,13 @@ class MiniCssExtractPlugin {
               hash: chunk.contentHash[NS],
             });
           }
-        }
+        },
       );
       compilation.chunkTemplate.hooks.renderManifest.tap(
         pluginName,
         (result, { chunk }) => {
           const renderedModules = Array.from(chunk.modulesIterable).filter(
-            (module) => module.type === NS
+            (module) => module.type === NS,
           );
           if (renderedModules.length > 0) {
             result.push({
@@ -194,7 +200,7 @@ class MiniCssExtractPlugin {
                 this.renderContentAsset(
                   chunk,
                   renderedModules,
-                  compilation.runtimeTemplate.requestShortener
+                  compilation.runtimeTemplate.requestShortener,
                 ),
               filenameTemplate: this.options.chunkFilename,
               pathOptions: {
@@ -205,7 +211,7 @@ class MiniCssExtractPlugin {
               hash: chunk.contentHash[NS],
             });
           }
-        }
+        },
       );
       compilation.mainTemplate.hooks.hashForChunk.tap(
         pluginName,
@@ -216,13 +222,13 @@ class MiniCssExtractPlugin {
           }
           if (REGEXP_CONTENTHASH.test(chunkFilename)) {
             hash.update(
-              JSON.stringify(chunk.getChunkMaps(true).contentHash[NS] || {})
+              JSON.stringify(chunk.getChunkMaps(true).contentHash[NS] || {}),
             );
           }
           if (REGEXP_NAME.test(chunkFilename)) {
             hash.update(JSON.stringify(chunk.getChunkMaps(true).name));
           }
-        }
+        },
       );
       compilation.hooks.contentHash.tap(pluginName, (chunk) => {
         const { outputOptions } = compilation;
@@ -234,9 +240,8 @@ class MiniCssExtractPlugin {
           }
         }
         const { contentHash } = chunk;
-        contentHash[NS] = hash
-          .digest(hashDigest)
-          .substring(0, hashDigestLength);
+        contentHash[NS] = hash.digest(hashDigest).
+          substring(0, hashDigestLength);
       });
       const { mainTemplate } = compilation;
       mainTemplate.hooks.localVars.tap(pluginName, (source, chunk) => {
@@ -248,7 +253,7 @@ class MiniCssExtractPlugin {
             '// object to store loaded CSS chunks',
             'var installedCssChunks = {',
             Template.indent(
-              chunk.ids.map((id) => `${JSON.stringify(id)}: 0`).join(',\n')
+              chunk.ids.map((id) => `${JSON.stringify(id)}: 0`).join(',\n'),
             ),
             '}',
           ]);
@@ -276,16 +281,16 @@ class MiniCssExtractPlugin {
                       if (typeof chunkMaps.hash[chunkId] === 'string') {
                         shortChunkHashMap[chunkId] = chunkMaps.hash[
                           chunkId
-                        ].substring(0, length);
+                          ].substring(0, length);
                       }
                     }
                     return `" + ${JSON.stringify(
-                      shortChunkHashMap
+                      shortChunkHashMap,
                     )}[chunkId] + "`;
                   },
                   contentHash: {
                     [NS]: `" + ${JSON.stringify(
-                      chunkMaps.contentHash[NS]
+                      chunkMaps.contentHash[NS],
                     )}[chunkId] + "`,
                   },
                   contentHashWithLength: {
@@ -296,20 +301,20 @@ class MiniCssExtractPlugin {
                         if (typeof contentHash[chunkId] === 'string') {
                           shortContentHashMap[chunkId] = contentHash[
                             chunkId
-                          ].substring(0, length);
+                            ].substring(0, length);
                         }
                       }
                       return `" + ${JSON.stringify(
-                        shortContentHashMap
+                        shortContentHashMap,
                       )}[chunkId] + "`;
                     },
                   },
                   name: `" + (${JSON.stringify(
-                    chunkMaps.name
+                    chunkMaps.name,
                   )}[chunkId]||chunkId) + "`,
                 },
                 contentHashType: NS,
-              }
+              },
             );
             return Template.asString([
               source,
@@ -363,13 +368,13 @@ class MiniCssExtractPlugin {
             ]);
           }
           return source;
-        }
+        },
       );
     });
   }
 
   getCssChunkObject(mainChunk) {
-    const obj = {};
+    /* const obj = {};
     for (const chunk of mainChunk.getAllAsyncChunks()) {
       for (const module of chunk.modulesIterable) {
         if (module.type === NS) {
@@ -377,8 +382,11 @@ class MiniCssExtractPlugin {
           break;
         }
       }
-    }
-    return obj;
+    } */
+
+    return mainChunk.getAllAsyncChunks().
+      reduce((obj, chunk) => chunk.modulesIterable.find(
+        module => module.type === NS) && (obj[chunk.id] = 1), {});
   }
 
   renderContentAsset(chunk, modules, requestShortener) {
@@ -423,15 +431,15 @@ class MiniCssExtractPlugin {
             new SourceMapSource(
               m.content,
               m.readableIdentifier(requestShortener),
-              m.sourceMap
-            )
+              m.sourceMap,
+            ),
           );
         } else {
           source.add(
             new OriginalSource(
               m.content,
-              m.readableIdentifier(requestShortener)
-            )
+              m.readableIdentifier(requestShortener),
+            ),
           );
         }
         source.add('\n');
